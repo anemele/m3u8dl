@@ -4,6 +4,7 @@ import pLimit from "p-limit";
 import { Parser, Segment } from "m3u8-parser";
 
 const OUT_DIR = "out";
+await ensureDir(OUT_DIR);
 
 async function hashsum(str: string): Promise<string> {
   const hash = await crypto.subtle.digest(
