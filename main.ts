@@ -1,5 +1,5 @@
 import { ensureDir } from "@std/fs";
-import { basename, join } from "@std/path";
+import { join } from "@std/path";
 import pLimit from "p-limit";
 import { Parser, Segment } from "m3u8-parser";
 
@@ -18,10 +18,7 @@ async function hashsum(str: string): Promise<string> {
 
 const KeyCache = new Map<string, CryptoKey>();
 
-async function fetchOne(segment: Segment, savePathDir: string) {
-  const filename = basename(segment.uri);
-  const savePath = join(savePathDir, filename);
-
+async function fetchOne(segment: Segment, savePath: string) {
   const resp = await fetch(segment.uri);
   const buf = await resp.arrayBuffer();
 
@@ -60,7 +57,6 @@ async function fetchOne(segment: Segment, savePathDir: string) {
 }
 
 async function fetchAll(m3u8Uri: string) {
-  // if exists, load from local
   let m3u8Text: string;
   let cachePath: string;
 
@@ -81,19 +77,18 @@ async function fetchAll(m3u8Uri: string) {
   parser.end();
   const segments = parser.manifest.segments;
 
+  const filenames = [] as string[];
   const limit = pLimit(10);
-  const tasks = segments.map((segment) => {
-    const task = limit(() => fetchOne(segment, cachePath));
+  const tasks = segments.map((segment, idx) => {
+    const filename = idx.toString().padStart(4, "0") + ".ts";
+    filenames.push(`file '${filename}'`);
+    const task = limit(() => fetchOne(segment, join(cachePath, filename)));
     return task;
   });
   await Promise.all(tasks);
 
-  const files = segments.map((segment) => {
-    const filename = basename(segment.uri);
-    return `file '${filename}'`;
-  });
   const filesPath = join(cachePath, "files.txt");
-  await Deno.writeTextFile(filesPath, files.join("\n"));
+  await Deno.writeTextFile(filesPath, filenames.join("\n"));
 
   const ffo = await new Deno.Command("ffmpeg", {
     args: [
