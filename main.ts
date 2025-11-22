@@ -1,5 +1,6 @@
 import { ensureDir } from "@std/fs";
 import { join } from "@std/path";
+import pLimit from "p-limit";
 
 const OUT_DIR = "out";
 
@@ -33,13 +34,17 @@ async function fetchAll(url: string) {
 
   const urls = await fetchM3U8(url);
 
-  await Promise.all(urls.map((url, idx) => {
+  const limit = pLimit(10);
+  const tasks = urls.map((url, idx) => {
     const filepath = join(
       cachePath,
       (idx + 1).toString().padStart(3, "0") + ".ts",
     );
-    return fetchOne(url, filepath);
-  }));
+    const task = limit(() => fetchOne(url, filepath));
+    return task;
+  });
+
+  await Promise.all(tasks);
 
   const files = [] as string[];
   Deno.readDirSync(cachePath).forEach((file) => {
