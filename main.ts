@@ -1,22 +1,9 @@
 import { ensureDir } from "@std/fs";
-import { join } from "@std/path";
+import { basename, join } from "@std/path";
 import pLimit from "p-limit";
+import { Parser, Segment } from "m3u8-parser";
 
 const OUT_DIR = "out";
-
-async function fetchM3U8(url: string): Promise<string[]> {
-  const resp = await fetch(url);
-  const text = await resp.text();
-  // await Deno.writeTextFile("play.m3u8", text);
-  const urls = text.trim().split("\n").filter((line) => !line.startsWith("#"));
-  return urls;
-}
-
-async function fetchOne(url: string, filepath: string) {
-  const resp = await fetch(url);
-  const arrayBuffer = await resp.arrayBuffer();
-  await Deno.writeFile(filepath, new Uint8Array(arrayBuffer));
-}
 
 async function hashsum(str: string): Promise<string> {
   const hash = await crypto.subtle.digest(
@@ -28,27 +15,74 @@ async function hashsum(str: string): Promise<string> {
     .join("");
 }
 
-async function fetchAll(url: string) {
-  const cachePath = join(OUT_DIR, await hashsum(url));
+async function fetchOne(segment: Segment, savePathDir: string) {
+  const filename = basename(segment.uri);
+  const savePath = join(savePathDir, filename);
+
+  const resp = await fetch(segment.uri);
+  const buf = await resp.arrayBuffer();
+
+  if (!segment.key) {
+    await Deno.writeFile(savePath, new Uint8Array(buf));
+    return;
+  }
+
+  const key = await crypto.subtle.importKey(
+    "raw",
+    await fetch(segment.key.uri).then((resp) => resp.arrayBuffer()),
+    {
+      // mostly AES-128 with CBC mode
+      name: "AES-CBC",
+      length: 128,
+    },
+    false,
+    ["decrypt"],
+  );
+
+  const dbuf = crypto.subtle.decrypt(
+    {
+      name: "AES-CBC",
+      iv: new Uint32Array(segment.key.iv ?? new ArrayBuffer(4)),
+    },
+    key,
+    buf,
+  );
+
+  await Deno.writeFile(savePath, new Uint8Array(await dbuf));
+}
+
+async function fetchAll(m3u8Uri: string) {
+  // if exists, load from local
+  let m3u8Text: string;
+  let cachePath: string;
+
+  if (!m3u8Uri.startsWith("http")) {
+    m3u8Text = await Deno.readTextFile(m3u8Uri);
+    cachePath = join(OUT_DIR, await hashsum(m3u8Text));
+  } else {
+    const resp = await fetch(m3u8Uri);
+    m3u8Text = await resp.text();
+    cachePath = join(OUT_DIR, await hashsum(m3u8Text));
+    await Deno.writeTextFile(`${cachePath}.m3u8`, m3u8Text);
+  }
+
   await ensureDir(cachePath);
 
-  const urls = await fetchM3U8(url);
+  const parser = new Parser();
+  parser.push(m3u8Text);
+  parser.end();
+  const segments = parser.manifest.segments;
 
   const limit = pLimit(10);
-  const tasks = urls.map((url, idx) => {
-    const filepath = join(
-      cachePath,
-      (idx + 1).toString().padStart(3, "0") + ".ts",
-    );
-    const task = limit(() => fetchOne(url, filepath));
+  const tasks = segments.map((segment) => {
+    const task = limit(() => fetchOne(segment, cachePath));
     return task;
   });
-
   await Promise.all(tasks);
 
-  const files = [] as string[];
-  Deno.readDirSync(cachePath).forEach((file) => {
-    files.push(`file '${file.name}'`);
+  const files = segments.map((segment) => {
+    const filename = basename(segment.uri);
+    return `file '${filename}'`;
   });
   const filesPath = join(cachePath, "files.txt");
   await Deno.writeTextFile(filesPath, files.join("\n"));
