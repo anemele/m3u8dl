@@ -16,6 +16,8 @@ async function hashsum(str: string): Promise<string> {
     .join("");
 }
 
+const KeyCache = new Map<string, CryptoKey>();
+
 async function fetchOne(segment: Segment, savePathDir: string) {
   const filename = basename(segment.uri);
   const savePath = join(savePathDir, filename);
@@ -28,17 +30,22 @@ async function fetchOne(segment: Segment, savePathDir: string) {
     return;
   }
 
-  const key = await crypto.subtle.importKey(
-    "raw",
-    await fetch(segment.key.uri).then((resp) => resp.arrayBuffer()),
-    {
-      // mostly AES-128 with CBC mode
-      name: "AES-CBC",
-      length: 128,
-    },
-    false,
-    ["decrypt"],
-  );
+  const keyUri = segment.key.uri;
+  let key = KeyCache.get(keyUri);
+  if (!key) {
+    key = await crypto.subtle.importKey(
+      "raw",
+      await fetch(keyUri).then((resp) => resp.arrayBuffer()),
+      {
+        // mostly AES-128 with CBC mode
+        name: "AES-CBC",
+        length: 128,
+      },
+      false,
+      ["decrypt"],
+    );
+    KeyCache.set(keyUri, key);
+  }
 
   const dbuf = crypto.subtle.decrypt(
     {
