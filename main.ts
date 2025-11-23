@@ -2,6 +2,7 @@ import { ensureDir } from "@std/fs";
 import { join } from "@std/path";
 import pLimit from "p-limit";
 import { Parser, Segment } from "m3u8-parser";
+import Progress from "cli-progress";
 
 const OUT_DIR = "out";
 await ensureDir(OUT_DIR);
@@ -18,7 +19,12 @@ async function hashsum(str: string): Promise<string> {
 
 const KeyCache = new Map<string, CryptoKey>();
 
-async function fetchOne(segment: Segment, savePath: string, origin: string) {
+async function fetchOne(
+  segment: Segment,
+  savePath: string,
+  origin: string,
+  bar: Progress.SingleBar,
+) {
   let uri = segment.uri;
   if (!uri.startsWith("http")) {
     uri = origin + uri;
@@ -29,6 +35,7 @@ async function fetchOne(segment: Segment, savePath: string, origin: string) {
 
   if (!segment.key) {
     await Deno.writeFile(savePath, new Uint8Array(buf));
+    bar.increment();
     return;
   }
 
@@ -63,6 +70,7 @@ async function fetchOne(segment: Segment, savePath: string, origin: string) {
   );
 
   await Deno.writeFile(savePath, new Uint8Array(await dbuf));
+  bar.increment();
 }
 
 async function fetchAll(m3u8Uri: string) {
@@ -70,6 +78,8 @@ async function fetchAll(m3u8Uri: string) {
   const m3u8Text = await resp.text();
 
   const m3u8Hashsum = await hashsum(m3u8Text);
+  console.log(`  ${m3u8Hashsum}`);
+
   const savePath = join(OUT_DIR, m3u8Hashsum);
   await ensureDir(savePath);
 
@@ -81,19 +91,29 @@ async function fetchAll(m3u8Uri: string) {
   parser.end();
   const segments = parser.manifest.segments;
 
-  const baseUrl = new URL(m3u8Uri);
+  const bar = new Progress.SingleBar({
+    format: "    [{bar}] {percentage}% | {value}/{total}",
+    barCompleteChar: "=",
+    barIncompleteChar: "-",
+    hideCursor: true,
+    barsize: 20,
+  });
 
   const filenames = [] as string[];
   const limit = pLimit(10);
+  const baseUrl = new URL(m3u8Uri);
   const tasks = segments.map((segment, idx) => {
     const filename = idx.toString().padStart(4, "0") + ".ts";
     filenames.push(`file '${filename}'`);
     const task = limit(() =>
-      fetchOne(segment, join(savePath, filename), baseUrl.origin)
+      fetchOne(segment, join(savePath, filename), baseUrl.origin, bar)
     );
     return task;
   });
+
+  bar.start(tasks.length, 0);
   await Promise.all(tasks);
+  bar.stop();
 
   const filesPath = join(savePath, "files.txt");
   await Deno.writeTextFile(filesPath, filenames.join("\n"));
