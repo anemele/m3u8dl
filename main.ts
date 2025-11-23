@@ -109,7 +109,7 @@ async function fetchAll(m3u8Uri: string) {
   });
 
   const filenames = [] as string[];
-  const limit = pLimit(10);
+  const limit = pLimit(6);
   const tasks = segments.map((segment, idx) => {
     const filename = idx.toString().padStart(4, "0") + ".ts";
     filenames.push(`file '${filename}'`);
@@ -136,6 +136,7 @@ async function fetchAll(m3u8Uri: string) {
       filesPath,
       "-c",
       "copy",
+      "-y",
       `${savePath}.mp4`,
     ],
   }).output();
@@ -146,7 +147,7 @@ async function fetchAll(m3u8Uri: string) {
     return;
   }
 
-  await Deno.remove(savePath, { recursive: true });
+  //await Deno.remove(savePath, { recursive: true });
 }
 
 if (import.meta.main) {
