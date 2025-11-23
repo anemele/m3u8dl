@@ -22,12 +22,16 @@ const KeyCache = new Map<string, CryptoKey>();
 async function fetchOne(
   segment: Segment,
   savePath: string,
-  origin: string,
+  m3u8Uri: string,
   bar: Progress.SingleBar,
 ) {
-  let uri = segment.uri;
+  let uri: string | URL = segment.uri;
   if (!uri.startsWith("http")) {
-    uri = origin + uri;
+    if (uri.startsWith("/")) {
+      uri = new URL(uri, new URL(m3u8Uri).origin);
+    } else {
+      uri = new URL(uri, m3u8Uri);
+    }
   }
 
   const resp = await fetch(uri);
@@ -39,9 +43,14 @@ async function fetchOne(
     return;
   }
 
-  let keyUri = segment.key.uri;
+  let keyUri: string | URL = segment.key.uri;
   if (!keyUri.startsWith("http")) {
-    keyUri = origin + keyUri;
+    if (keyUri.startsWith("/")) {
+      keyUri = new URL(keyUri, new URL(m3u8Uri).origin);
+    } else {
+      keyUri = new URL(keyUri, m3u8Uri);
+    }
+    keyUri = keyUri.toString();
   }
 
   let key = KeyCache.get(keyUri);
@@ -101,12 +110,11 @@ async function fetchAll(m3u8Uri: string) {
 
   const filenames = [] as string[];
   const limit = pLimit(10);
-  const baseUrl = new URL(m3u8Uri);
   const tasks = segments.map((segment, idx) => {
     const filename = idx.toString().padStart(4, "0") + ".ts";
     filenames.push(`file '${filename}'`);
     const task = limit(() =>
-      fetchOne(segment, join(savePath, filename), baseUrl.origin, bar)
+      fetchOne(segment, join(savePath, filename), m3u8Uri, bar)
     );
     return task;
   });
