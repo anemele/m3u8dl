@@ -1,3 +1,4 @@
+import { Application, Router } from "@oak/oak";
 import { join } from "@std/path";
 import { CACHE_DIR, fetchAll, validateAndPrepare } from "./core.ts";
 
@@ -24,72 +25,56 @@ async function getListHtml(): Promise<string> {
 }
 
 function getPlayerHtml(pathname: string) {
-  return tmplPlayer.replace(
-    "{{M3U8URL}}",
-    pathname.replace(/^\/video/, "") + "/index.m3u8",
-  );
+  return tmplPlayer.replace("{{M3U8URL}}", pathname + "/index.m3u8");
 }
 
-Deno.serve(async (req) => {
-  // console.log(req);
-  const url = new URL(req.url);
-  // console.log(url);
-  const pathname = url.pathname;
+const router = new Router();
 
-  if (
-    pathname.endsWith(".ts") ||
-    pathname.endsWith(".m3u8")
-  ) {
-    return new Response(await readLocalResource(pathname));
-  }
-
-  if (pathname.startsWith("/video")) {
-    return new Response(getPlayerHtml(pathname), {
-      headers: {
-        "Content-Type": "text/html; charset=UTF-8",
-      },
-    });
-  }
-
-  if (pathname === "/list") {
-    return new Response(await getListHtml(), {
-      headers: {
-        "Content-Type": "text/html; charset=UTF-8",
-      },
-    });
-  }
-
-  if (pathname === "/download") {
-    const body = await req.json();
-    const m3u8Url: string = body.url;
-    const video = await validateAndPrepare(m3u8Url);
-    if (!video) {
-      return new Response("Invalid M3U8 URL", {
-        status: 400,
-      });
-    }
-
-    fetchAll(m3u8Url, video.savePath, video.segments).catch((err) => {
-      console.error(err);
-    });
-
-    return new Response(video.m3u8Hashsum, {
-      headers: {
-        "Content-Type": "text/plain; charset=UTF-8",
-      },
-      status: 200,
-    });
-  }
-
-  if (pathname === "/") {
-    return new Response(await Deno.readFile("./static/index.html"), {
-      headers: {
-        "Content-Type": "text/html; charset=UTF-8",
-      },
-    });
-  }
-
-  return new Response(await Deno.readFile("./static/404.html"), {
-    status: 404,
-  });
+router.get("/", async (ctx) => {
+  ctx.response.body = await Deno.readFile("./static/index.html");
 });
+
+router.get("/list", async (ctx) => {
+  ctx.response.body = await getListHtml();
+});
+
+router.get("/video/:video", (ctx) => {
+  const video = ctx.params.video;
+  ctx.response.body = getPlayerHtml(`/video/${video}`);
+});
+
+router.post("/download", async (ctx) => {
+  const body = await ctx.request.body.json();
+  const m3u8Url: string = body.url;
+  const vpr = await validateAndPrepare(m3u8Url);
+  if (!vpr) {
+    ctx.response.body = "Invalid M3U8 URL";
+    ctx.response.status = 400;
+    return;
+  }
+
+  fetchAll(m3u8Url, vpr).catch((err) => {
+    console.error(err);
+  });
+
+  ctx.response.body = vpr.m3u8Hashsum;
+  ctx.response.status = 200;
+});
+
+router.get("/video/:video/index.m3u8", async (ctx) => {
+  const video = ctx.params.video;
+  ctx.response.body = await readLocalResource(join(video, "index.m3u8"));
+});
+
+router.get("/video/:video/:segment.ts", async (ctx) => {
+  const video = ctx.params.video;
+  const segment = ctx.params.segment;
+  ctx.response.body = await readLocalResource(join(video, `${segment}.ts`));
+});
+
+const app = new Application();
+
+app.use(router.routes());
+app.use(router.allowedMethods());
+
+app.listen({ port: 8080 });

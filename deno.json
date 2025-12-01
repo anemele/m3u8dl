@@ -4,6 +4,7 @@
     "svr": "deno run -R -W -N svr.ts"
   },
   "imports": {
+    "@oak/oak": "jsr:@oak/oak@^17.2.0",
     "@std/fs": "jsr:@std/fs@^1.0.20",
     "@std/path": "jsr:@std/path@^1.1.3",
     "@types/cli-progress": "npm:@types/cli-progress@^3.11.6",

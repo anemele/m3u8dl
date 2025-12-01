@@ -102,14 +102,15 @@ function numberedFilename(num: number): string {
   return num.toString().padStart(4, "0") + ".ts";
 }
 
-async function validateAndPrepare(m3u8Uri: string): Promise<
-  | null
-  | {
-    m3u8Hashsum: string;
-    savePath: string;
-    segments: Segment[];
-  }
-> {
+interface ValidateAndPrepareResult {
+  m3u8Hashsum: string;
+  savePath: string;
+  segments: Segment[];
+}
+
+async function validateAndPrepare(
+  m3u8Uri: string,
+): Promise<null | ValidateAndPrepareResult> {
   const resp = await fetch(m3u8Uri);
 
   // 这个判断会不会太简单了？
@@ -121,7 +122,7 @@ async function validateAndPrepare(m3u8Uri: string): Promise<
   const m3u8Text = await resp.text();
 
   const m3u8Hashsum = await hashsum(m3u8Text);
-  console.log(`  ${m3u8Hashsum}`);
+  // console.log(`  ${m3u8Hashsum}`);
 
   const savePath = join(CACHE_DIR, m3u8Hashsum);
   await ensureDir(savePath);
@@ -151,28 +152,30 @@ async function validateAndPrepare(m3u8Uri: string): Promise<
   };
 }
 
+const multiBar = new Progress.MultiBar({
+  format: "    [{bar}] {percentage}% | {value}/{total}",
+  barCompleteChar: "#",
+  barIncompleteChar: "-",
+  hideCursor: true,
+  barsize: 15,
+});
+
 async function fetchAll(
   m3u8Uri: string,
-  savePath: string,
-  segments: Segment[],
+  vpr: ValidateAndPrepareResult,
 ): Promise<void> {
-  const bar = new Progress.SingleBar({
-    format: "    [{bar}] {percentage}% | {value}/{total}",
-    barCompleteChar: "=",
-    barIncompleteChar: "-",
-    hideCursor: true,
-    barsize: 20,
+  const bar = multiBar.create(vpr.segments.length, 0, null, {
+    format: ` ${vpr.m3u8Hashsum} | [{bar}] {percentage}% | {value}/{total}`,
   });
-
   const limit = pLimit(6);
-  const tasks = segments.map((segment, idx) => {
+  const tasks = vpr.segments.map((segment, idx) => {
     const filename = numberedFilename(idx);
-    const saveSegmentPath = join(savePath, filename);
+    const saveSegmentPath = join(vpr.savePath, filename);
     const task = limit(() => fetchOne(segment, saveSegmentPath, m3u8Uri, bar));
     return task;
   });
 
-  bar.start(tasks.length, 0);
+  // bar.start(tasks.length, 0);
   await Promise.all(tasks);
   bar.stop();
 }

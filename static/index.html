@@ -1,48 +1,56 @@
 <html lang="en">
-  <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>M3U8 Downloader</title>
-  </head>
 
-  <body>
-    <h1>M3U8 Downloader</h1>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>M3U8 Downloader</title>
+  <style>
+    #url {
+      width: 100%;
+    }
+  </style>
+</head>
 
-    <h3><a href="/list">List</a></h3>
+<body>
+  <h1>M3U8 Downloader</h1>
 
-    <input type="text" name="url" id="url" placeholder="M3U8 URL">
-    <button id="btn">Download and play</button>
-  </body>
+  <h3><a href="/list">List</a></h3>
 
-  <script>
-    const btn = document.getElementById("btn");
-    btn.addEventListener("click", () => {
-      const url = document.getElementById("url").value;
-      if (!url) {
-        alert("Please input M3U8 URL");
+  <div><input type="text" name="url" id="url" placeholder="M3U8 URL"></div>
+  <br>
+  <div><button id="btn">Download and play</button></div>
+</body>
+
+<script>
+  const btn = document.getElementById("btn");
+  btn.addEventListener("click", () => {
+    const url = document.getElementById("url").value;
+    if (!url) {
+      alert("Please input M3U8 URL");
+      return;
+    }
+    // console.log(url)
+    fetch("/download", {
+      body: JSON.stringify({ url }),
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    }).then((resp) => {
+      if (resp.status !== 200) {
+        alert(resp.statusText);
         return;
       }
-      // console.log(url)
-      fetch("/download", {
-        body: JSON.stringify({ url }),
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      }).then((resp) => {
-        if (resp.status !== 200) {
-          alert(resp.statusText);
-          return;
-        }
 
-        alert("Got video path. waiting for player...");
-        setTimeout(() => {
-          resp.text().then((text) => {
-            window.location.href = `/video/${text}`;
-          });
-          // wait for cache
-        }, 3000);
-      });
+      alert("Got video path. waiting for player...");
+      setTimeout(() => {
+        resp.text().then((text) => {
+          window.location.href = `/video/${text}`;
+        });
+        // wait for cache
+      }, 1000);
     });
-  </script>
+  });
+</script>
+
 </html>

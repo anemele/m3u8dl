@@ -11,11 +11,13 @@ if (import.meta.main) {
       break;
     }
     try {
-      const data = await validateAndPrepare(url);
-      if (!data) {
+      const vpr = await validateAndPrepare(url);
+      if (!vpr) {
         continue;
       }
-      await fetchAll(url, data.m3u8Hashsum, data.segments);
+      fetchAll(url, vpr).catch((e) => {
+        console.error(e);
+      });
     } catch (e) {
       console.error(e);
     }
