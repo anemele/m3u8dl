@@ -153,11 +153,11 @@ async function validateAndPrepare(
 }
 
 const multiBar = new Progress.MultiBar({
-  format: "    [{bar}] {percentage}% | {value}/{total}",
+  // format: "    [{bar}] {percentage}% | {value}/{total}",
   barCompleteChar: "#",
   barIncompleteChar: "-",
   hideCursor: true,
-  barsize: 15,
+  // barsize: 20,
 });
 
 async function fetchAll(
@@ -165,7 +165,8 @@ async function fetchAll(
   vpr: ValidateAndPrepareResult,
 ): Promise<void> {
   const bar = multiBar.create(vpr.segments.length, 0, null, {
-    format: ` ${vpr.m3u8Hashsum} | [{bar}] {percentage}% | {value}/{total}`,
+    format: ` ${vpr.m3u8Hashsum} | [{bar}] {value}/{total}`,
+    barsize: 10,
   });
   const limit = pLimit(6);
   const tasks = vpr.segments.map(async (segment, idx) => {
