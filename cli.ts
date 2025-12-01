@@ -15,9 +15,7 @@ if (import.meta.main) {
       if (!vpr) {
         continue;
       }
-      fetchAll(url, vpr).catch((e) => {
-        console.error(e);
-      });
+      await fetchAll(url, vpr);
     } catch (e) {
       console.error(e);
     }

@@ -77,4 +77,6 @@ const app = new Application();
 app.use(router.routes());
 app.use(router.allowedMethods());
 
-app.listen({ port: 8080 });
+const addr = { hostname: "127.0.0.1", port: 8080 };
+console.log(`server is running at http://${addr.hostname}:${addr.port}`);
+app.listen(addr);
