@@ -1,16 +1,48 @@
 <html lang="en">
-
-<head>
+  <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>M3U8 Player</title>
-</head>
+    <title>M3U8 Downloader</title>
+  </head>
 
-<body>
-    <h1>M3U8 Player</h1>
-    <div>
-        {{VideoList}}
-    </div>
-</body>
+  <body>
+    <h1>M3U8 Downloader</h1>
 
+    <h3><a href="/list">List</a></h3>
+
+    <input type="text" name="url" id="url" placeholder="M3U8 URL">
+    <button id="btn">Download and play</button>
+  </body>
+
+  <script>
+    const btn = document.getElementById("btn");
+    btn.addEventListener("click", () => {
+      const url = document.getElementById("url").value;
+      if (!url) {
+        alert("Please input M3U8 URL");
+        return;
+      }
+      // console.log(url)
+      fetch("/download", {
+        body: JSON.stringify({ url }),
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }).then((resp) => {
+        if (resp.status !== 200) {
+          alert(resp.statusText);
+          return;
+        }
+
+        alert("Got video path. waiting for player...");
+        setTimeout(() => {
+          resp.text().then((text) => {
+            window.location.href = `/video/${text}`;
+          });
+          // wait for cache
+        }, 3000);
+      });
+    });
+  </script>
 </html>

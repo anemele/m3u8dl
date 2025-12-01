@@ -98,8 +98,26 @@ async function fetchOne(
   bar.increment();
 }
 
-async function fetchAll(m3u8Uri: string) {
+function numberedFilename(num: number): string {
+  return num.toString().padStart(4, "0") + ".ts";
+}
+
+async function validateAndPrepare(m3u8Uri: string): Promise<
+  | null
+  | {
+    m3u8Hashsum: string;
+    savePath: string;
+    segments: Segment[];
+  }
+> {
   const resp = await fetch(m3u8Uri);
+
+  // 这个判断会不会太简单了？
+  if (resp.status !== 200) {
+    console.error(resp.statusText);
+    return null;
+  }
+
   const m3u8Text = await resp.text();
 
   const m3u8Hashsum = await hashsum(m3u8Text);
@@ -110,10 +128,6 @@ async function fetchAll(m3u8Uri: string) {
 
   await Deno.writeTextFile(join(savePath, "m3u8.url"), m3u8Uri);
   await Deno.writeTextFile(join(savePath, "m3u8.raw"), m3u8Text);
-
-  function numberedFilename(num: number): string {
-    return num.toString().padStart(4, "0") + ".ts";
-  }
 
   let lineNum = 0;
   const lines = m3u8Text.trim().split("\n").map((line) => {
@@ -130,6 +144,18 @@ async function fetchAll(m3u8Uri: string) {
   parser.end();
   const segments = parser.manifest.segments;
 
+  return {
+    m3u8Hashsum,
+    savePath,
+    segments,
+  };
+}
+
+async function fetchAll(
+  m3u8Uri: string,
+  savePath: string,
+  segments: Segment[],
+): Promise<void> {
   const bar = new Progress.SingleBar({
     format: "    [{bar}] {percentage}% | {value}/{total}",
     barCompleteChar: "=",
@@ -151,20 +177,4 @@ async function fetchAll(m3u8Uri: string) {
   bar.stop();
 }
 
-if (import.meta.main) {
-  console.log("m3u8dl <url>");
-  console.log("type nothing to exit");
-
-  while (true) {
-    console.log();
-    const url = prompt("url> ")?.trim();
-    if (!url) {
-      break;
-    }
-    try {
-      await fetchAll(url);
-    } catch (e) {
-      console.error(e);
-    }
-  }
-}
+export { CACHE_DIR, fetchAll, validateAndPrepare };
