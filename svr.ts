@@ -8,28 +8,27 @@ async function readLocalResource(
   return await Deno.readFile(join(CACHE_DIR, pathname));
 }
 
+const tmplIndex = await Deno.readTextFile("./static/index.html");
+const tmplPlayer = await Deno.readTextFile("./static/player.html");
+
 async function getIndexHtml(): Promise<string> {
-  const tmplIndex = await Deno.readTextFile("./static/index.html");
-  const videoList: string[] = [];
+  const elemList: string[] = [];
   for await (const entry of Deno.readDir(CACHE_DIR)) {
-    videoList.push(entry.name);
+    const video = entry.name;
+    const elem = `<li><a href="/video/${video}">${video}</a></li>`;
+    elemList.push(elem);
   }
-  const indexHtml = tmplIndex.replace(
+  return tmplIndex.replace(
     "{{VideoList}}",
-    videoList.map(
-      (video) => `<li><a href="/video/${video}">${video}</a></li>`,
-    ).join("\n"),
+    elemList.join("\n"),
   );
-  return indexHtml;
 }
 
-async function getPlayerHtml(pathname: string) {
-  const tmplPlayer = await Deno.readTextFile("./static/player.html");
-  const playerHtml = tmplPlayer.replace(
+function getPlayerHtml(pathname: string) {
+  return tmplPlayer.replace(
     "{{M3U8URL}}",
     pathname.replace(/^\/video/, "") + "/index.m3u8",
   );
-  return playerHtml;
 }
 
 Deno.serve(async (req) => {
@@ -46,7 +45,7 @@ Deno.serve(async (req) => {
   }
 
   if (pathname.startsWith("/video")) {
-    return new Response(await getPlayerHtml(pathname), {
+    return new Response(getPlayerHtml(pathname), {
       headers: {
         "Content-Type": "text/html; charset=UTF-8",
       },
