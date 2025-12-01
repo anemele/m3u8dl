@@ -116,7 +116,7 @@ async function fetchAll(m3u8Uri: string) {
   }
 
   let lineNum = 0;
-  const lines = m3u8Text.split("\n").map((line) => {
+  const lines = m3u8Text.trim().split("\n").map((line) => {
     if (line.startsWith("#")) {
       return line;
     } else {
