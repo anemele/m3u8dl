@@ -14,7 +14,7 @@
  * ├── ...
  */
 
-import { ensureDir } from "@std/fs";
+import { ensureDir, exists } from "@std/fs";
 import { join } from "@std/path";
 import pLimit from "p-limit";
 import { Parser, Segment } from "m3u8-parser";
@@ -168,9 +168,13 @@ async function fetchAll(
     format: ` ${vpr.m3u8Hashsum} | [{bar}] {percentage}% | {value}/{total}`,
   });
   const limit = pLimit(6);
-  const tasks = vpr.segments.map((segment, idx) => {
+  const tasks = vpr.segments.map(async (segment, idx) => {
     const filename = numberedFilename(idx);
     const saveSegmentPath = join(vpr.savePath, filename);
+    if (await exists(saveSegmentPath)) {
+      bar.increment();
+      return null;
+    }
     const task = limit(() => fetchOne(segment, saveSegmentPath, m3u8Uri, bar));
     return task;
   });
