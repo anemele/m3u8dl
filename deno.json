@@ -1,6 +1,7 @@
 {
   "tasks": {
-    "dev": "deno run -R -W -N main.ts"
+    "dev": "deno run -R -W -N main.ts",
+    "svr": "deno run -R -N svr.ts"
   },
   "imports": {
     "@std/fs": "jsr:@std/fs@^1.0.20",

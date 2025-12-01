@@ -1,0 +1,43 @@
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>M3U8 播放器</title>
+    <!-- 引入 hls.js 库，解决兼容性问题 -->
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+</head>
+
+<body>
+    <!-- 添加 controls 显示播放控制栏，autoplay 可选（需注意浏览器自动播放政策） -->
+    <video id="hlsVideo" controls width="auto" height="auto" autoplay muted></video>
+
+    <script>
+        const video = document.getElementById('hlsVideo');
+        const m3u8Url = "{{M3U8URL}}"; // 替换为实际的 m3u8 地址
+
+        // 核心逻辑：判断浏览器是否支持 HLS，不支持则用 hls.js 解析
+        if (Hls.isSupported()) {
+            const hls = new Hls();
+            hls.loadSource(m3u8Url); // 加载 m3u8 链接
+            hls.attachMedia(video); // 绑定到 video 元素
+            // 当视频元数据解析完成后自动播放（可选）
+            hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                video.play().catch(err => console.log('自动播放失败：', err));
+            });
+        }
+        // 兼容少数原生支持 HLS 的浏览器（如 Safari）
+        else if (video.canPlayType('application/x-mpegURL')) {
+            video.src = m3u8Url;
+            video.addEventListener('loadedmetadata', () => {
+                video.play().catch(err => console.log('自动播放失败：', err));
+            });
+        }
+        // 浏览器完全不支持 HLS 的 fallback 提示
+        else {
+            alert('你的浏览器不支持播放该视频格式，请更新浏览器或使用 Chrome/Edge/Safari 最新版');
+        }
+    </script>
+</body>
+
+</html>
