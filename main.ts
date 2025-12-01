@@ -1,11 +1,27 @@
+/*
+ * m3u8dl
+ *
+ * cache structure
+ *
+ * .cache/
+ * ├── <hashsum>/
+ * │   ├── 0001.ts
+ * │   ├── 0002.ts
+ * │   ├── ...
+ * │   ├── index.m3u8
+ * │   ├── m3u8.raw
+ * │   ├── m3u8.url
+ * ├── ...
+ */
+
 import { ensureDir } from "@std/fs";
 import { join } from "@std/path";
 import pLimit from "p-limit";
 import { Parser, Segment } from "m3u8-parser";
 import Progress from "cli-progress";
 
-const OUT_DIR = "out";
-await ensureDir(OUT_DIR);
+const CACHE_DIR = ".cache";
+await ensureDir(CACHE_DIR);
 
 async function hashsum(str: string): Promise<string> {
   const hash = await crypto.subtle.digest(
@@ -89,11 +105,25 @@ async function fetchAll(m3u8Uri: string) {
   const m3u8Hashsum = await hashsum(m3u8Text);
   console.log(`  ${m3u8Hashsum}`);
 
-  const savePath = join(OUT_DIR, m3u8Hashsum);
+  const savePath = join(CACHE_DIR, m3u8Hashsum);
   await ensureDir(savePath);
 
-  await Deno.writeTextFile(`${savePath}.url`, m3u8Uri);
-  await Deno.writeTextFile(`${savePath}.m3u8`, m3u8Text);
+  await Deno.writeTextFile(join(savePath, "m3u8.url"), m3u8Uri);
+  await Deno.writeTextFile(join(savePath, "m3u8.raw"), m3u8Text);
+
+  function numberedFilename(num: number): string {
+    return num.toString().padStart(4, "0") + ".ts";
+  }
+
+  let lineNum = 0;
+  const lines = m3u8Text.split("\n").map((line) => {
+    if (line.startsWith("#")) {
+      return line;
+    } else {
+      return numberedFilename(lineNum++);
+    }
+  });
+  await Deno.writeTextFile(join(savePath, "index.m3u8"), lines.join("\n"));
 
   const parser = new Parser();
   parser.push(m3u8Text);
@@ -108,46 +138,17 @@ async function fetchAll(m3u8Uri: string) {
     barsize: 20,
   });
 
-  const filenames = [] as string[];
   const limit = pLimit(6);
   const tasks = segments.map((segment, idx) => {
-    const filename = idx.toString().padStart(4, "0") + ".ts";
-    filenames.push(`file '${filename}'`);
-    const task = limit(() =>
-      fetchOne(segment, join(savePath, filename), m3u8Uri, bar)
-    );
+    const filename = numberedFilename(idx);
+    const saveSegmentPath = join(savePath, filename);
+    const task = limit(() => fetchOne(segment, saveSegmentPath, m3u8Uri, bar));
     return task;
   });
 
   bar.start(tasks.length, 0);
   await Promise.all(tasks);
   bar.stop();
-
-  const filesPath = join(savePath, "files.txt");
-  await Deno.writeTextFile(filesPath, filenames.join("\n"));
-
-  const ffo = await new Deno.Command("ffmpeg", {
-    args: [
-      "-f",
-      "concat",
-      "-safe",
-      "0",
-      "-i",
-      filesPath,
-      "-c",
-      "copy",
-      "-y",
-      `${savePath}.mp4`,
-    ],
-  }).output();
-
-  if (!ffo.success) {
-    console.error("ffmpeg failed");
-    console.error(new TextDecoder().decode(ffo.stderr));
-    return;
-  }
-
-  //await Deno.remove(savePath, { recursive: true });
 }
 
 if (import.meta.main) {
