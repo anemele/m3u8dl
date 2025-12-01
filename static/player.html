@@ -4,13 +4,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>M3U8 播放器</title>
+    <style>
+        #hlsVideo {
+            max-width: 100%;
+            max-height: 100%;
+        }
+    </style>
     <!-- 引入 hls.js 库，解决兼容性问题 -->
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 </head>
 
 <body>
     <!-- 添加 controls 显示播放控制栏，autoplay 可选（需注意浏览器自动播放政策） -->
-    <video id="hlsVideo" controls width="auto" height="auto" autoplay muted></video>
+    <video id="hlsVideo" controls autoplay muted></video>
 
     <script>
         const video = document.getElementById('hlsVideo');
