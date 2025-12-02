@@ -1,6 +1,6 @@
 {
   "tasks": {
-    "dev": "deno run -R -W -N cli.ts",
+    "cli": "deno run -R -W -N cli.ts",
     "svr": "deno run -R -W -N svr.ts"
   },
   "imports": {

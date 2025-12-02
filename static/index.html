@@ -18,7 +18,7 @@
 
   <div><input type="text" name="url" id="url" placeholder="M3U8 URL"></div>
   <br>
-  <div><button id="btn">Download and play</button></div>
+  <div><button id="btn">Download</button></div>
 </body>
 
 <script>
@@ -37,18 +37,16 @@
         "Content-Type": "application/json",
       },
     }).then((resp) => {
-      if (resp.status !== 200) {
-        alert(resp.statusText);
-        return;
-      }
+      resp.text().then((text) => {
+        // console.log(text);
 
-      alert("Got video path. waiting for player...");
-      setTimeout(() => {
-        resp.text().then((text) => {
-          window.location.href = `/video/${text}`;
-        });
-        // wait for cache
-      }, 1000);
+        if (resp.status !== 200) {
+          alert(text);
+        } else {
+          alert(`Downloading: ${text}`);
+          // window.location.href = `/video/${text}`;
+        }
+      });
     });
   });
 </script>

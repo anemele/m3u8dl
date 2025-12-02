@@ -1,6 +1,7 @@
 import { Application, Router } from "@oak/oak";
 import { join } from "@std/path";
 import { CACHE_DIR, fetchAll, validateAndPrepare } from "./core.ts";
+import { exists } from "@std/fs/exists";
 
 async function readLocalResource(
   pathname: string,
@@ -15,12 +16,15 @@ async function getListHtml(): Promise<string> {
   const elemList: string[] = [];
   for await (const entry of Deno.readDir(CACHE_DIR)) {
     const video = entry.name;
+    if (!await exists(join(CACHE_DIR, video, "index.m3u8"))) {
+      continue;
+    }
     const elem = `<li><a href="/video/${video}">${video}</a></li>`;
     elemList.push(elem);
   }
   return tmplList.replace(
     "{{VideoList}}",
-    elemList.join("\n"),
+    elemList.length > 0 ? elemList.join("\n") : "No video found",
   );
 }
 

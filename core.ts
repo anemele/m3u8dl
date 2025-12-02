@@ -111,7 +111,12 @@ interface ValidateAndPrepareResult {
 async function validateAndPrepare(
   m3u8Uri: string,
 ): Promise<null | ValidateAndPrepareResult> {
-  const resp = await fetch(m3u8Uri);
+  let resp: Response;
+  try {
+    resp = await fetch(m3u8Uri);
+  } catch (_err) {
+    return null;
+  }
 
   // 这个判断会不会太简单了？
   if (resp.status !== 200) {
